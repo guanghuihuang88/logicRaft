@@ -9,6 +9,7 @@ import (
 	"course/labrpc"
 )
 
+// ApplyMsg 每次有日志条目提交时，每个 Raft 实例需要向该 channel 发送一条 apply 消息
 type ApplyMsg struct {
 	CommandValid bool
 	Command      interface{}
@@ -45,6 +46,7 @@ type Raft struct {
 	electionTimeout time.Duration
 }
 
+// GetState 询问 Raft 实例其当前的 term，以及是否自认为 Leader（但实际由于网络分区的发生，可能并不是）
 func (rf *Raft) GetState() (int, bool) {
 	// Your code here (PartA).
 	rf.mu.Lock()
@@ -52,6 +54,7 @@ func (rf *Raft) GetState() (int, bool) {
 	return rf.currentTerm, rf.role == Leader
 }
 
+// Start 就一个新的日志条目达成一致
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	index := -1
 	term := -1
@@ -70,6 +73,7 @@ func (rf *Raft) killed() bool {
 	return z == 1
 }
 
+// Make 创建一个新的 Raft 实例
 func Make(peers []*labrpc.ClientEnd, me int,
 	persister *Persister, applyCh chan ApplyMsg) *Raft {
 	rf := &Raft{}
@@ -77,9 +81,10 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.persister = persister
 	rf.me = me
 
-	rf.readPersist(persister.ReadRaftState())
-
-	go rf.ticker()
-
 	return rf
+}
+
+func (rf *Raft) Snapshot(index int, snapshot []byte) {
+	// Your code here (2D).
+
 }
