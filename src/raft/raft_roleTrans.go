@@ -10,7 +10,7 @@ func (rf *Raft) becomeFollowerLocked(term int) {
 	LOG(rf.me, rf.currentTerm, DLog, "%s -> Follower, For T%d->T%d",
 		rf.role, rf.currentTerm, term)
 
-	// important! Could only reset the `votedFor` when term increased
+	// ！！！只有当Term增加时，才需要重置选票
 	if term > rf.currentTerm {
 		rf.votedFor = -1
 	}
@@ -33,12 +33,14 @@ func (rf *Raft) becomeCandidateLocked() {
 
 func (rf *Raft) becomeLeaderLocked() {
 	if rf.role != Candidate {
-		LOG(rf.me, rf.currentTerm, DLeader,
-			"%s, Only candidate can become Leader", rf.role)
+		LOG(rf.me, rf.currentTerm, DError, "Only Candidate can become Leader")
 		return
 	}
 
-	LOG(rf.me, rf.currentTerm, DLeader, "%s -> Leader, For T%d",
-		rf.role, rf.currentTerm)
+	LOG(rf.me, rf.currentTerm, DLeader, "Become Leader in T%d", rf.currentTerm)
 	rf.role = Leader
+	for peer := 0; peer < len(rf.peers); peer++ {
+		rf.nextIndex[peer] = len(rf.log)
+		rf.matchIndex[peer] = 0
+	}
 }

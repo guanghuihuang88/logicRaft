@@ -37,13 +37,26 @@ type Raft struct {
 	me        int                 // this peer's index into peers[]
 	dead      int32               // set by Kill()
 
-	role        Role
-	currentTerm int
-	votedFor    int
-
 	// used for election loop
+	role            Role
+	currentTerm     int
+	votedFor        int
 	electionStart   time.Time
 	electionTimeout time.Duration
+
+	// log in Peer's local
+	log []LogRecord
+
+	// only used when it is Leader,
+	// log view for each peer
+	nextIndex  []int
+	matchIndex []int
+
+	// fields for apply loop
+	commitIndex int
+	lastApplied int
+	applyCh     chan ApplyMsg
+	applyCond   *sync.Cond
 }
 
 // GetState 询问 Raft 实例其当前的 term，以及是否自认为 Leader（但实际由于网络分区的发生，可能并不是）
@@ -56,11 +69,20 @@ func (rf *Raft) GetState() (int, bool) {
 
 // Start 就一个新的日志条目达成一致
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
-	index := -1
-	term := -1
-	isLeader := true
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
 
-	return index, term, isLeader
+	if rf.role != Leader {
+		return 0, 0, false
+	}
+	rf.log = append(rf.log, LogRecord{
+		CommandValid: true,
+		Command:      command,
+		Term:         rf.currentTerm,
+	})
+	LOG(rf.me, rf.currentTerm, DLeader, "Leader accept log [%d]T%d", len(rf.log)-1, rf.currentTerm)
+
+	return len(rf.log) - 1, rf.currentTerm, true
 }
 
 func (rf *Raft) Kill() {
@@ -80,6 +102,14 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.peers = peers
 	rf.persister = persister
 	rf.me = me
+
+	// 初始化日志同步所需变量
+	rf.log = append(rf.log, LogRecord{})
+	rf.matchIndex = make([]int, len(rf.peers))
+	rf.nextIndex = make([]int, len(rf.peers))
+
+	go rf.electionTicker()
+	go rf.applicationTicker()
 
 	return rf
 }
