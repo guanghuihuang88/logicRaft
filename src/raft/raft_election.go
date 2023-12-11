@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 )
@@ -21,9 +22,17 @@ type RequestVoteArgs struct {
 	LastLogTerm  int // candidate的log最新索引的Term
 }
 
+func (args *RequestVoteArgs) String() string {
+	return fmt.Sprintf("Candidate-%d, T%d, Last: [%d]T%d", args.CandidateId, args.Term, args.LastLogIndex, args.LastLogTerm)
+}
+
 type RequestVoteReply struct {
 	Term        int  // 投票者任期
 	VoteGranted bool // 是否投票
+}
+
+func (reply *RequestVoteReply) String() string {
+	return fmt.Sprintf("T%d, VoteGranted: %v", reply.Term, reply.VoteGranted)
 }
 
 // electionTicker 选举loop
@@ -51,12 +60,6 @@ func (rf *Raft) startElection(term int) bool {
 
 	// askVoteFromPeer 单次 RPC（这里实现为嵌套函数的作用是，可以在各个 goroutine 中修改外层的局部变量 votes
 	askVoteFromPeer := func(peer int, args *RequestVoteArgs, term int) {
-
-		// 检查上下文
-		if rf.contextLostLocked(Candidate, term) {
-			LOG(rf.me, rf.currentTerm, DLog, "Lost Leader[%d] to %s[T%d]", term, rf.role, rf.currentTerm)
-			return
-		}
 
 		// send RPC
 		reply := &RequestVoteReply{}
@@ -88,7 +91,7 @@ func (rf *Raft) startElection(term int) bool {
 		}
 		if votes > len(rf.peers)/2 {
 			rf.becomeLeaderLocked()
-			//go rf.replicationTicker(term)
+			go rf.replicationTicker(term)
 		}
 	}
 
@@ -131,6 +134,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
+	LOG(rf.me, rf.currentTerm, DDebug, "<- S%d, VoteAsked, Args=%v", args.CandidateId, args.String())
 
 	reply.Term = rf.currentTerm
 	reply.VoteGranted = false
@@ -181,7 +185,7 @@ func (rf *Raft) contextLostLocked(role Role, term int) bool {
 }
 
 // isMoreUpToDateLocked 日志比较
-func (rf *Raft) isMoreUpToDateLocked(candidateIndex, candidateTerm int) bool {
+func (rf *Raft) isMoreUpToDateLocked(candidateTerm, candidateIndex int) bool {
 	l := len(rf.log)
 	lastTerm, lastIndex := rf.log[l-1].Term, l-1
 	LOG(rf.me, rf.currentTerm, DVote, "Compare last log, Me: [%d]T%d, Candidate: [%d]T%d", lastIndex, lastTerm, candidateIndex, candidateTerm)

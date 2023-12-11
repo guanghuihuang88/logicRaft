@@ -108,6 +108,12 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.matchIndex = make([]int, len(rf.peers))
 	rf.nextIndex = make([]int, len(rf.peers))
 
+	// 初始化日志应用所需变量
+	rf.applyCh = applyCh
+	rf.commitIndex = 0
+	rf.lastApplied = 0
+	rf.applyCond = sync.NewCond(&rf.mu)
+
 	go rf.electionTicker()
 	go rf.applicationTicker()
 

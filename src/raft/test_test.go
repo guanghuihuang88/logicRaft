@@ -8,6 +8,9 @@ package raft
 // test with the original before submitting.
 //
 
+// VERBOSE=0 go test -run TestBasicAgreePartB | tee out.txt
+// dslogs -c 3 -t out.txt
+
 import (
 	"fmt"
 	"math/rand"
