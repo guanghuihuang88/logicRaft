@@ -10,12 +10,17 @@ func (rf *Raft) becomeFollowerLocked(term int) {
 	LOG(rf.me, rf.currentTerm, DLog, "%s -> Follower, For T%d->T%d",
 		rf.role, rf.currentTerm, term)
 
+	shouldPersist := term != rf.currentTerm
+
 	// ！！！只有当Term增加时，才需要重置选票
 	if term > rf.currentTerm {
 		rf.votedFor = -1
 	}
 	rf.role = Follower
 	rf.currentTerm = term
+	if shouldPersist {
+		rf.persistLocked()
+	}
 }
 
 func (rf *Raft) becomeCandidateLocked() {
@@ -29,6 +34,7 @@ func (rf *Raft) becomeCandidateLocked() {
 	rf.role = Candidate
 	rf.currentTerm++
 	rf.votedFor = rf.me
+	rf.persistLocked()
 }
 
 func (rf *Raft) becomeLeaderLocked() {

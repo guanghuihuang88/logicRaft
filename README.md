@@ -540,6 +540,10 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
         if args.Term < rf.currentTerm {
           return
         }
+  
+        // 只要认可对方是Leader就重置时钟
+        defer rf.resetElectionTimerLocked()
+  
         if args.Term >= rf.currentTerm {
           rf.becomeFollowerLocked(args.Term)
         }
@@ -725,7 +729,7 @@ func (rf *Raft) replicateToPeer(peer int, args *AppendEntriesArgs) {
 
 				// 一致性检查成功，更新 rf.matchIndex 后
         majorityMatched := rf.getMajorityIndexLocked()
-        if majorityMatched > rf.commitIndex {
+        if majorityMatched > rf.commitIndex && rf.log[majorityMatched].Term == rf.currentTerm {
                 rf.commitIndex = majorityMatched
                 rf.applyCond.Signal()
         }
@@ -772,4 +776,6 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 2. replicateToPeer 处理 reply 时，检查自己仍然是给定 term 的 Leader
 3. startElection 前，检查自己仍然是给定 term 的 Candidate
 4. askVoteFromPeer 处理 reply 时，检查自己仍然是给定 term 的 Candidate
+
+## 6 状态持久化
 

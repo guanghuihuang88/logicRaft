@@ -43,7 +43,6 @@ func (rf *Raft) electionTicker() {
 		rf.mu.Lock()
 		if rf.role != Leader && rf.isElectionTimeoutLocked() {
 			rf.becomeCandidateLocked()
-
 			go rf.startElection(rf.currentTerm)
 		}
 		rf.mu.Unlock()
@@ -55,11 +54,11 @@ func (rf *Raft) electionTicker() {
 }
 
 // startElection 开始选举
-func (rf *Raft) startElection(term int) bool {
+func (rf *Raft) startElection(term int) {
 	votes := 0
 
 	// askVoteFromPeer 单次 RPC（这里实现为嵌套函数的作用是，可以在各个 goroutine 中修改外层的局部变量 votes
-	askVoteFromPeer := func(peer int, args *RequestVoteArgs, term int) {
+	askVoteFromPeer := func(peer int, args *RequestVoteArgs) {
 
 		// send RPC
 		reply := &RequestVoteReply{}
@@ -100,9 +99,10 @@ func (rf *Raft) startElection(term int) bool {
 
 	// 检查上下文
 	if rf.contextLostLocked(Candidate, term) {
-		return false
+		return
 	}
 
+	l := len(rf.log)
 	for peer := 0; peer < len(rf.peers); peer++ {
 		if peer == rf.me {
 			votes++
@@ -112,14 +112,14 @@ func (rf *Raft) startElection(term int) bool {
 		args := &RequestVoteArgs{
 			Term:         rf.currentTerm,
 			CandidateId:  rf.me,
-			LastLogIndex: len(rf.log) - 1,
-			LastLogTerm:  rf.log[len(rf.log)-1].Term,
+			LastLogIndex: l - 1,
+			LastLogTerm:  rf.log[l-1].Term,
 		}
+		LOG(rf.me, rf.currentTerm, DDebug, "-> S%d, AskVote, Args=%v", peer, args.String())
 
-		go askVoteFromPeer(peer, args, term)
+		go askVoteFromPeer(peer, args)
 	}
 
-	return true
 }
 
 // sendRequestVote RPC
@@ -161,6 +161,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 	reply.VoteGranted = true
 	rf.votedFor = args.CandidateId
+	rf.persistLocked()
 	rf.resetElectionTimerLocked()
 	LOG(rf.me, rf.currentTerm, DVote, "-> S%d, Vote granted", args.CandidateId)
 }

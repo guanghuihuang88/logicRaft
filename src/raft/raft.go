@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -28,6 +29,11 @@ const (
 	Follower  Role = "Follower"
 	Candidate Role = "Candidate"
 	Leader    Role = "Leader"
+)
+
+const (
+	InvalidTerm  int = 0
+	InvalidIndex int = 0
 )
 
 type Raft struct {
@@ -80,6 +86,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		Command:      command,
 		Term:         rf.currentTerm,
 	})
+	rf.persistLocked()
 	LOG(rf.me, rf.currentTerm, DLeader, "Leader accept log [%d]T%d", len(rf.log)-1, rf.currentTerm)
 
 	return len(rf.log) - 1, rf.currentTerm, true
@@ -103,8 +110,14 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.persister = persister
 	rf.me = me
 
+	//  initialization code
+	rf.role = Follower
+	rf.currentTerm = 1 // leave 0 to invalid
+	rf.votedFor = -1
+	// a dummy entry to aovid lots of corner checks
+	rf.log = append(rf.log, LogRecord{Term: InvalidTerm})
+
 	// 初始化日志同步所需变量
-	rf.log = append(rf.log, LogRecord{})
 	rf.matchIndex = make([]int, len(rf.peers))
 	rf.nextIndex = make([]int, len(rf.peers))
 
@@ -114,13 +127,45 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.lastApplied = 0
 	rf.applyCond = sync.NewCond(&rf.mu)
 
+	rf.readPersist(persister.ReadRaftState())
+
 	go rf.electionTicker()
 	go rf.applicationTicker()
 
 	return rf
 }
 
+func (rf *Raft) firstLogFor(term int) int {
+	for idx, entry := range rf.log {
+		if entry.Term == term {
+			return idx
+		} else if entry.Term > term {
+			break
+		}
+	}
+	return InvalidIndex
+}
+
+func (rf *Raft) logString() string {
+	var terms string
+	prevTerm := rf.log[0].Term
+	prevStart := 0
+	for i := 0; i < len(rf.log); i++ {
+		if rf.log[i].Term != prevTerm {
+			terms += fmt.Sprintf(" [%d, %d]T%d", prevStart, i-1, prevTerm)
+			prevTerm = rf.log[i].Term
+			prevStart = i
+		}
+	}
+	terms += fmt.Sprintf("[%d, %d]T%d", prevStart, len(rf.log)-1, prevTerm)
+	return terms
+}
+
+// the service says it has created a snapshot that has
+// all info up to and including index. this means the
+// service no longer needs the log through (and including)
+// that index. Raft should now trim its log as much as possible.
 func (rf *Raft) Snapshot(index int, snapshot []byte) {
-	// Your code here (2D).
+	// Your code here (PartD).
 
 }

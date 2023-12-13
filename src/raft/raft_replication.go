@@ -32,9 +32,8 @@ type AppendEntriesReply struct {
 	Success bool // Follower包含了匹配上PrevLogIndex和PrevLogTerm的日志时，为true
 
 	// 一致性检查失败时，用来加速日志修复的参数
-	XTerm  int // 这个是Follower中与Leader冲突的Log对应的任期号，如果Follower在对应位置没有Log，那么这里会返回-1。
-	XIndex int // 若XTerm!=-1，XIndex对应任期号为XTerm的第一条Log条目的槽位号
-	XLen   int // 若XTerm=-1，XLen表示空白的Log槽位数
+	ConfilictIndex int
+	ConfilictTerm  int
 }
 
 // replicationTicker 心跳（日志同步）loop
@@ -113,12 +112,21 @@ func (rf *Raft) replicateToPeer(peer int, args *AppendEntriesArgs, term int) {
 	// 当一致性检查失败，说明 Leader 相应 peer 在 nextIndex 前一个位置的任期不一致 （leader.log[idx].Term > peer.log[idx].Term）
 	// 则往前找到 Leader.log 在上一个 Term 的最后一个 index
 	if !reply.Success {
-		idx := rf.nextIndex[peer] - 1
-		term := rf.log[idx].Term
-		for idx > 0 && rf.log[idx].Term == term {
-			idx--
+		prevNext := rf.nextIndex[peer]
+		if reply.ConfilictTerm == InvalidTerm {
+			rf.nextIndex[peer] = reply.ConfilictIndex
+		} else {
+			firstTermIndex := rf.firstLogFor(reply.ConfilictTerm)
+			if firstTermIndex != InvalidIndex {
+				rf.nextIndex[peer] = firstTermIndex
+			} else {
+				rf.nextIndex[peer] = reply.ConfilictIndex
+			}
 		}
-		rf.nextIndex[peer] = idx + 1
+		// avoid the late reply move the nextIndex forward again
+		if rf.nextIndex[peer] > prevNext {
+			rf.nextIndex[peer] = prevNext
+		}
 		LOG(rf.me, rf.currentTerm, DLog, "Log not matched in %d, Update next=%d", args.PrevLogIndex, rf.nextIndex[peer])
 		return
 	}
@@ -132,7 +140,7 @@ func (rf *Raft) replicateToPeer(peer int, args *AppendEntriesArgs, term int) {
 
 	// 日志应用
 	majorityMatched := rf.getMajorityIndexLocked()
-	if majorityMatched > rf.commitIndex {
+	if majorityMatched > rf.commitIndex && rf.log[majorityMatched].Term == rf.currentTerm {
 		LOG(rf.me, rf.currentTerm, DApply, "Leader update the commit index %d->%d", rf.commitIndex, majorityMatched)
 		rf.commitIndex = majorityMatched
 		rf.applyCond.Signal()
@@ -158,22 +166,36 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		LOG(rf.me, rf.currentTerm, DLog2, "<- S%d, Reject Log, Higher term, T%d<T%d", args.LeaderId, args.Term, rf.currentTerm)
 		return
 	}
+
 	if args.Term >= rf.currentTerm {
 		rf.becomeFollowerLocked(args.Term)
 	}
+	// 只要认可对方是Leader就重置时钟
+	defer func() {
+		rf.resetElectionTimerLocked()
+		if !reply.Success {
+			LOG(rf.me, rf.currentTerm, DLog2, "<- S%d, Follower Conflict: [%d]T%d", args.LeaderId, reply.ConfilictIndex, reply.ConfilictTerm)
+			LOG(rf.me, rf.currentTerm, DDebug, "<- S%d, Follower Log=%v", args.LeaderId, rf.logString())
+		}
+	}()
 
 	// 一致性检查
 	if args.PrevLogIndex >= len(rf.log) {
+		reply.ConfilictTerm = InvalidTerm
+		reply.ConfilictIndex = len(rf.log)
 		LOG(rf.me, rf.currentTerm, DLog2, "<- S%d, Reject Log, Follower log too short, Len:%d <= Prev:%d", args.LeaderId, len(rf.log), args.PrevLogIndex)
 		return
 	}
 	if rf.log[args.PrevLogIndex].Term != args.PrevLogTerm {
+		reply.ConfilictTerm = rf.log[args.PrevLogIndex].Term
+		reply.ConfilictIndex = rf.firstLogFor(reply.ConfilictTerm)
 		LOG(rf.me, rf.currentTerm, DLog2, "<- S%d, Reject Log, Prev log not match, [%d]: T%d != T%d", args.LeaderId, args.PrevLogIndex, rf.log[args.PrevLogIndex].Term, args.PrevLogTerm)
 		return
 	}
 
 	// 日志同步
 	rf.log = append(rf.log[:args.PrevLogIndex+1], args.Entries...)
+	rf.persistLocked()
 	LOG(rf.me, rf.currentTerm, DLog2, "Follower append logs: (%d, %d]", args.PrevLogIndex, args.PrevLogIndex+len(args.Entries))
 	reply.Success = true
 
@@ -184,7 +206,6 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		rf.applyCond.Signal()
 	}
 
-	rf.resetElectionTimerLocked()
 }
 
 // getMajorityIndexLocked 计算多数 Peer 的匹配点
