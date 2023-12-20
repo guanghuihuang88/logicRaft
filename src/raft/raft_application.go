@@ -1,5 +1,6 @@
 package raft
 
+// applicationTicker 可以理解成log日志的消费者，每次消费完最新可commit的日志后，就挂起消费协程；当生产协程(replicateToPeer函数)更新commitIndex后，消费协程被唤醒
 func (rf *Raft) applicationTicker() {
 	for !rf.killed() {
 		rf.mu.Lock()
@@ -8,7 +9,7 @@ func (rf *Raft) applicationTicker() {
 		// 1. 构造所有待 apply 的 ApplyMsg
 		entries := make([]LogRecord, 0)
 		for i := rf.lastApplied + 1; i <= rf.commitIndex; i++ {
-			entries = append(entries, rf.log[i])
+			entries = append(entries, rf.log.get(i))
 		}
 		rf.mu.Unlock()
 

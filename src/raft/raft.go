@@ -1,7 +1,7 @@
 package raft
 
 import (
-	"fmt"
+	"encoding/json"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -51,7 +51,7 @@ type Raft struct {
 	electionTimeout time.Duration
 
 	// log in Peer's local
-	log []LogRecord
+	log Log
 
 	// only used when it is Leader,
 	// log view for each peer
@@ -81,15 +81,15 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	if rf.role != Leader {
 		return 0, 0, false
 	}
-	rf.log = append(rf.log, LogRecord{
+	rf.log.append(LogRecord{
 		CommandValid: true,
 		Command:      command,
 		Term:         rf.currentTerm,
 	})
 	rf.persistLocked()
-	LOG(rf.me, rf.currentTerm, DLeader, "Leader accept log [%d]T%d", len(rf.log)-1, rf.currentTerm)
+	LOG(rf.me, rf.currentTerm, DLeader, "Leader accept log [%d]T%d", rf.log.size()-1, rf.currentTerm)
 
-	return len(rf.log) - 1, rf.currentTerm, true
+	return rf.log.size() - 1, rf.currentTerm, true
 }
 
 func (rf *Raft) Kill() {
@@ -115,7 +115,11 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.currentTerm = 1 // leave 0 to invalid
 	rf.votedFor = -1
 	// a dummy entry to aovid lots of corner checks
-	rf.log = append(rf.log, LogRecord{Term: InvalidTerm})
+	rf.log = Log{
+		Records: make([]LogRecord, 0),
+		Base:    0,
+	}
+	rf.log.append(LogRecord{Term: InvalidTerm})
 
 	// 初始化日志同步所需变量
 	rf.matchIndex = make([]int, len(rf.peers))
@@ -135,37 +139,19 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	return rf
 }
 
-func (rf *Raft) firstLogFor(term int) int {
-	for idx, entry := range rf.log {
-		if entry.Term == term {
-			return idx
-		} else if entry.Term > term {
-			break
-		}
+func DeepCopy(src interface{}) (interface{}, error) {
+	// 将对象转换为 JSON 字符串
+	jsonBytes, err := json.Marshal(src)
+	if err != nil {
+		return nil, err
 	}
-	return InvalidIndex
-}
 
-func (rf *Raft) logString() string {
-	var terms string
-	prevTerm := rf.log[0].Term
-	prevStart := 0
-	for i := 0; i < len(rf.log); i++ {
-		if rf.log[i].Term != prevTerm {
-			terms += fmt.Sprintf(" [%d, %d]T%d", prevStart, i-1, prevTerm)
-			prevTerm = rf.log[i].Term
-			prevStart = i
-		}
+	// 将 JSON 字符串反序列化为新的对象
+	var dst interface{}
+	err = json.Unmarshal(jsonBytes, &dst)
+	if err != nil {
+		return nil, err
 	}
-	terms += fmt.Sprintf("[%d, %d]T%d", prevStart, len(rf.log)-1, prevTerm)
-	return terms
-}
 
-// the service says it has created a snapshot that has
-// all info up to and including index. this means the
-// service no longer needs the log through (and including)
-// that index. Raft should now trim its log as much as possible.
-func (rf *Raft) Snapshot(index int, snapshot []byte) {
-	// Your code here (PartD).
-
+	return dst, nil
 }

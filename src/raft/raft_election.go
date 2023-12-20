@@ -102,7 +102,6 @@ func (rf *Raft) startElection(term int) {
 		return
 	}
 
-	l := len(rf.log)
 	for peer := 0; peer < len(rf.peers); peer++ {
 		if peer == rf.me {
 			votes++
@@ -112,8 +111,8 @@ func (rf *Raft) startElection(term int) {
 		args := &RequestVoteArgs{
 			Term:         rf.currentTerm,
 			CandidateId:  rf.me,
-			LastLogIndex: l - 1,
-			LastLogTerm:  rf.log[l-1].Term,
+			LastLogIndex: rf.log.size() - 1,
+			LastLogTerm:  rf.log.lastLogTerm(),
 		}
 		LOG(rf.me, rf.currentTerm, DDebug, "-> S%d, AskVote, Args=%v", peer, args.String())
 
@@ -187,8 +186,7 @@ func (rf *Raft) contextLostLocked(role Role, term int) bool {
 
 // isMoreUpToDateLocked 日志比较
 func (rf *Raft) isMoreUpToDateLocked(candidateTerm, candidateIndex int) bool {
-	l := len(rf.log)
-	lastTerm, lastIndex := rf.log[l-1].Term, l-1
+	lastTerm, lastIndex := rf.log.lastLogTerm(), rf.log.size()-1
 	LOG(rf.me, rf.currentTerm, DVote, "Compare last log, Me: [%d]T%d, Candidate: [%d]T%d", lastIndex, lastTerm, candidateIndex, candidateTerm)
 
 	if lastTerm != candidateTerm {

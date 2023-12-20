@@ -7,7 +7,7 @@ import (
 )
 
 func (rf *Raft) persistString() string {
-	return fmt.Sprintf("T%d, VotedFor: %d, Log: [0: %d)", rf.currentTerm, rf.votedFor, len(rf.log))
+	return fmt.Sprintf("T%d, VotedFor: %d, Log: [0: %d)", rf.currentTerm, rf.votedFor, rf.log.size())
 }
 
 // save Raft's persistent state to stable storage,
@@ -36,7 +36,7 @@ func (rf *Raft) readPersist(data []byte) {
 	// Example:
 	var currentTerm int
 	var votedFor int
-	var log []LogRecord
+	var log Log
 
 	buf := bytes.NewBuffer(data)
 	decoder := labgob.NewDecoder(buf)

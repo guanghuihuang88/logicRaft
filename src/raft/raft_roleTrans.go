@@ -46,7 +46,7 @@ func (rf *Raft) becomeLeaderLocked() {
 	LOG(rf.me, rf.currentTerm, DLeader, "Become Leader in T%d", rf.currentTerm)
 	rf.role = Leader
 	for peer := 0; peer < len(rf.peers); peer++ {
-		rf.nextIndex[peer] = len(rf.log)
+		rf.nextIndex[peer] = rf.log.size()
 		rf.matchIndex[peer] = 0
 	}
 }
