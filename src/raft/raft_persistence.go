@@ -17,13 +17,17 @@ func (rf *Raft) persistString() string {
 // second argument to persister.Save().
 // after you've implemented snapshots, pass the current snapshot
 // (or nil if there's not yet a snapshot).
-func (rf *Raft) persistLocked() {
+
+func (rf *Raft) persistLocked(snapshot []byte) {
+	if snapshot == nil {
+		snapshot = rf.persister.ReadSnapshot()
+	}
 	buf := new(bytes.Buffer)
 	encode := labgob.NewEncoder(buf)
 	encode.Encode(rf.currentTerm)
 	encode.Encode(rf.votedFor)
 	encode.Encode(rf.log)
-	rf.persister.Save(buf.Bytes(), nil)
+	rf.persister.Save(buf.Bytes(), snapshot)
 	LOG(rf.me, rf.currentTerm, DPersist, "Persist: %v", rf.persistString())
 }
 

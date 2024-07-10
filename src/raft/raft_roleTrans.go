@@ -19,7 +19,7 @@ func (rf *Raft) becomeFollowerLocked(term int) {
 	rf.role = Follower
 	rf.currentTerm = term
 	if shouldPersist {
-		rf.persistLocked()
+		rf.persistLocked(nil)
 	}
 }
 
@@ -34,7 +34,7 @@ func (rf *Raft) becomeCandidateLocked() {
 	rf.role = Candidate
 	rf.currentTerm++
 	rf.votedFor = rf.me
-	rf.persistLocked()
+	rf.persistLocked(nil)
 }
 
 func (rf *Raft) becomeLeaderLocked() {
@@ -47,6 +47,6 @@ func (rf *Raft) becomeLeaderLocked() {
 	rf.role = Leader
 	for peer := 0; peer < len(rf.peers); peer++ {
 		rf.nextIndex[peer] = rf.log.size()
-		rf.matchIndex[peer] = 0
+		rf.matchIndex[peer] = rf.log.Base
 	}
 }

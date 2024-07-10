@@ -62,7 +62,22 @@ func (rf *Raft) startReplication(term int) bool {
 		}
 
 		prevIdx := rf.nextIndex[peer] - 1
+		// 如果需要同步的日志在快照中，则发送快照RPC
+		if prevIdx < rf.log.Base {
+			args := &InstallSnapshotArgs{
+				Term:              rf.currentTerm,
+				LeaderId:          rf.me,
+				LastIncludedIndex: rf.log.Base,
+				LastIncludedTerm:  rf.log.Records[0].Term,
+				Offset:            0,
+				Data:              rf.persister.ReadSnapshot(),
+				Done:              false,
+			}
+			go rf.snapshotToPeer(peer, args, term)
+			continue
+		}
 		prevTerm := rf.log.get(prevIdx).Term
+
 		args := &AppendEntriesArgs{
 			Term:         rf.currentTerm,
 			LeaderId:     rf.me,
@@ -189,7 +204,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 
 	// 日志同步
 	rf.log.Records = append(rf.log.Records[:args.PrevLogIndex+1-rf.log.Base], args.Entries...)
-	rf.persistLocked()
+	rf.persistLocked(nil)
 	LOG(rf.me, rf.currentTerm, DLog2, "Follower append logs: (%d, %d]", args.PrevLogIndex, args.PrevLogIndex+len(args.Entries))
 	reply.Success = true
 

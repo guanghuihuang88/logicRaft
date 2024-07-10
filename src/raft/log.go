@@ -8,6 +8,14 @@ type LogRecord struct {
 	Command      interface{}
 }
 
+func (log *LogRecord) copy() LogRecord {
+	newLogRecord := LogRecord{}
+	newLogRecord.Term = log.Term
+	newLogRecord.CommandValid = log.CommandValid
+	newLogRecord.Command = log.Command
+	return newLogRecord
+}
+
 type Log struct {
 	Records []LogRecord
 	Base    int
@@ -23,14 +31,6 @@ func (log *Log) get(i int) LogRecord {
 
 func (log *Log) size() int {
 	return log.Base + len(log.Records)
-}
-
-func (log *Log) lastIncludedIndex() int {
-	return log.Base
-}
-
-func (log *Log) lastIncludedTerm() int {
-	return log.Records[0].Term
 }
 
 func (log *Log) lastLogTerm() int {

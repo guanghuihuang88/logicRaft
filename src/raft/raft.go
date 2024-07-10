@@ -86,7 +86,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		Command:      command,
 		Term:         rf.currentTerm,
 	})
-	rf.persistLocked()
+	rf.persistLocked(nil)
 	LOG(rf.me, rf.currentTerm, DLeader, "Leader accept log [%d]T%d", rf.log.size()-1, rf.currentTerm)
 
 	return rf.log.size() - 1, rf.currentTerm, true
@@ -131,7 +131,11 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.lastApplied = 0
 	rf.applyCond = sync.NewCond(&rf.mu)
 
-	rf.readPersist(persister.ReadRaftState())
+	rf.readPersist(persister.ReadRaftState()) // 同步快照信息
+	if rf.log.Base > 0 {
+		rf.commitIndex = rf.log.Base
+		rf.lastApplied = rf.log.Base
+	}
 
 	go rf.electionTicker()
 	go rf.applicationTicker()
