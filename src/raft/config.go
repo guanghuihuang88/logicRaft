@@ -10,8 +10,8 @@ package raft
 
 import (
 	"bytes"
-	"course/labgob"
-	"course/labrpc"
+	"github.com/guanghuihuang88/logicRaft/labgob"
+	"github.com/guanghuihuang88/logicRaft/labrpc"
 	"log"
 	"math/rand"
 	"runtime"

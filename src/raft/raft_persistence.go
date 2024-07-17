@@ -2,8 +2,8 @@ package raft
 
 import (
 	"bytes"
-	"course/labgob"
 	"fmt"
+	"github.com/guanghuihuang88/logicRaft/labgob"
 )
 
 func (rf *Raft) persistString() string {

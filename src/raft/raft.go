@@ -2,12 +2,11 @@ package raft
 
 import (
 	"encoding/json"
+	"github.com/guanghuihuang88/logicRaft/labrpc"
 	"sync"
 	"sync/atomic"
 	"time"
-
 	//	"course/labgob"
-	"course/labrpc"
 )
 
 // ApplyMsg 每次有日志条目提交时，每个 Raft 实例需要向该 channel 发送一条 apply 消息
