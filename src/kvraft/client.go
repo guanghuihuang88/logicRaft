@@ -9,6 +9,9 @@ import "math/big"
 type Clerk struct {
 	servers  []*labrpc.ClientEnd
 	leaderId int
+	// clientID+seqID 确定一个唯一的命令,防止重复的写操作
+	clientId int64
+	seqId    int64
 }
 
 func nrand() int64 {
@@ -22,14 +25,16 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 	ck := new(Clerk)
 	ck.servers = servers
 	ck.leaderId = 0
+	ck.clientId = nrand()
+	ck.seqId = 0
 	return ck
 }
 
 func (ck *Clerk) Get(key string) string {
 	args := &GetArgs{Key: key}
-	var reply GetReply
 
 	for {
+		var reply GetReply
 		ok := ck.servers[ck.leaderId].Call("KVServer.Get", &args, &reply)
 		if !ok || reply.Err == ErrWrongLeader || reply.Err == ErrTimeout {
 			ck.leaderId = (ck.leaderId + 1) % len(ck.servers)
@@ -43,19 +48,22 @@ func (ck *Clerk) Get(key string) string {
 
 func (ck *Clerk) PutAppend(key string, value string, op string) {
 	args := &PutAppendArgs{
-		Key:   key,
-		Value: value,
-		Op:    op,
+		Key:      key,
+		Value:    value,
+		Op:       op,
+		ClientId: ck.clientId,
+		SeqId:    ck.seqId,
 	}
-	var reply PutAppendReply
 
 	for {
+		var reply PutAppendReply
 		ok := ck.servers[ck.leaderId].Call("KVServer.PutAppend", &args, &reply)
 		if !ok || reply.Err == ErrWrongLeader || reply.Err == ErrTimeout {
 			ck.leaderId = (ck.leaderId + 1) % len(ck.servers)
 			continue
 		}
 		// 调用成功 返回
+		ck.seqId++
 		return
 	}
 }
