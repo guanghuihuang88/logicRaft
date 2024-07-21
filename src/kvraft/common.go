@@ -41,7 +41,8 @@ type GetReply struct {
 	Value string
 }
 
-const ClientRequestTimeout = 500 * time.Microsecond
+const ClientRequestTimeout = 500 * time.Millisecond
+
 const Debug = false
 
 func DPrintf(format string, a ...interface{}) (n int, err error) {

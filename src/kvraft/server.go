@@ -30,6 +30,7 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 	// 调用 raft，将请求存储到 raft 日志中并进行同步
 	index, _, isLeader := kv.rf.Start(Op{Key: args.Key, OpType: OpGet})
 
+	// 如果不是 Leader 的话，直接返回错误
 	if !isLeader {
 		reply.Err = ErrWrongLeader
 		return
@@ -60,16 +61,19 @@ func (kv *KVServer) requestDuplicated(clientId, seqId int64) bool {
 	info, ok := kv.duplicateTable[clientId]
 	return ok && seqId <= info.SeqId
 }
+
 func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 	// 判断请求是否重复
 	kv.mu.Lock()
 	if kv.requestDuplicated(args.ClientId, args.SeqId) {
+		// 如果是重复请求，直接返回结果
 		opReply := kv.duplicateTable[args.ClientId].Reply
 		reply.Err = opReply.Err
 		kv.mu.Unlock()
 		return
 	}
 	kv.mu.Unlock()
+
 	// 调用 raft，将请求存储到 raft 日志中并进行同步
 	index, _, isLeader := kv.rf.Start(Op{
 		Key:      args.Key,
@@ -79,6 +83,7 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 		SeqId:    args.SeqId,
 	})
 
+	// 如果不是 Leader 的话，直接返回错误
 	if !isLeader {
 		reply.Err = ErrWrongLeader
 		return
@@ -96,7 +101,7 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 		reply.Err = ErrTimeout
 	}
 
-	// 删除
+	// 删除通知的 channel
 	go func() {
 		kv.mu.Lock()
 		kv.removeNotifyChannel(index)
@@ -104,8 +109,7 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 	}()
 }
 
-//
-// the tester calls Kill() when a KVServer instance won't
+// Kill the tester calls Kill() when a KVServer instance won't
 // be needed again. for your convenience, we supply
 // code to set rf.dead (without needing a lock),
 // and a killed() method to test rf.dead in
@@ -113,7 +117,6 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 // code to Kill(). you're not required to do anything
 // about this, but it may be convenient (for example)
 // to suppress debug output from a Kill()ed instance.
-//
 func (kv *KVServer) Kill() {
 	atomic.StoreInt32(&kv.dead, 1)
 	kv.rf.Kill()
@@ -125,8 +128,7 @@ func (kv *KVServer) killed() bool {
 	return z == 1
 }
 
-//
-// servers[] contains the ports of the set of
+// StartKVServer servers[] contains the ports of the set of
 // servers that will cooperate via Raft to
 // form the fault-tolerant key/value service.
 // me is the index of the current server in servers[].
@@ -138,7 +140,6 @@ func (kv *KVServer) killed() bool {
 // you don't need to snapshot.
 // StartKVServer() must return quickly, so it should start goroutines
 // for any long-running work.
-//
 func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister, maxraftstate int) *KVServer {
 	// call labgob.Register on structures you want
 	// Go's RPC library to marshall/unmarshall.
@@ -148,16 +149,19 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv.me = me
 	kv.maxraftstate = maxraftstate
 
-	// 初始化
+	// You may need initialization code here.
+
 	kv.applyCh = make(chan raft.ApplyMsg)
 	kv.rf = raft.Make(servers, me, persister, kv.applyCh)
 
+	// You may need initialization code here.
 	kv.dead = 0
 	kv.lastApplied = 0
 	kv.stateMachine = NewKVStateMachine()
 	kv.notifyChans = make(map[int]chan *OpReply)
 	kv.duplicateTable = make(map[int64]LastOperationInfo)
 
+	// 从 snapshot 中恢复状态
 	kv.restoreFromSnapshot(persister.ReadSnapshot())
 
 	go kv.applyTask()
@@ -178,12 +182,13 @@ func (kv *KVServer) applyTask() {
 				}
 				kv.lastApplied = message.CommandIndex
 
-				// 取出用户操作信息
+				// 取出用户的操作信息
 				op := message.Command.(Op)
 				var opReply *OpReply
 				if op.OpType != OpGet && kv.requestDuplicated(op.ClientId, op.SeqId) {
 					opReply = kv.duplicateTable[op.ClientId].Reply
 				} else {
+					// 将操作应用状态机中
 					opReply = kv.applyToStateMachine(op)
 					if op.OpType != OpGet {
 						kv.duplicateTable[op.ClientId] = LastOperationInfo{
@@ -226,14 +231,11 @@ func (kv *KVServer) applyToStateMachine(op Op) *OpReply {
 	case OpAppend:
 		err = kv.stateMachine.Append(op.Key, op.Value)
 	}
-	return &OpReply{
-		Value: value,
-		Err:   err,
-	}
+	return &OpReply{Value: value, Err: err}
 }
 
 func (kv *KVServer) getNotifyChannel(index int) chan *OpReply {
-	if _, ok := kv.notifyChans[index]; ok {
+	if _, ok := kv.notifyChans[index]; !ok {
 		kv.notifyChans[index] = make(chan *OpReply, 1)
 	}
 	return kv.notifyChans[index]
@@ -261,7 +263,7 @@ func (kv *KVServer) restoreFromSnapshot(snapshot []byte) {
 	var stateMachine KVStateMachine
 	var dupTable map[int64]LastOperationInfo
 	if dec.Decode(&stateMachine) != nil || dec.Decode(&dupTable) != nil {
-		panic("failed to restore state from snapshot")
+		panic("failed to restore state from snapshpt")
 	}
 
 	kv.stateMachine = &stateMachine

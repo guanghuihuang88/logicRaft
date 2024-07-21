@@ -8,8 +8,8 @@ import "math/big"
 
 type Clerk struct {
 	servers  []*labrpc.ClientEnd
-	leaderId int
-	// clientID+seqID 确定一个唯一的命令,防止重复的写操作
+	leaderId int // 记录 Leader 节点的 id，避免下一次请求的时候去轮询查找 Leader
+	// clientID+seqId 确定一个唯一的命令
 	clientId int64
 	seqId    int64
 }
@@ -31,23 +31,35 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 }
 
 func (ck *Clerk) Get(key string) string {
-	args := &GetArgs{Key: key}
+	// You will have to modify this function.
+	args := GetArgs{
+		Key: key,
+	}
 
 	for {
 		var reply GetReply
 		ok := ck.servers[ck.leaderId].Call("KVServer.Get", &args, &reply)
 		if !ok || reply.Err == ErrWrongLeader || reply.Err == ErrTimeout {
+			// 请求失败，选择另一个节点重试
 			ck.leaderId = (ck.leaderId + 1) % len(ck.servers)
 			continue
 		}
-		// 调用成功 返回 value
+		// 调用成功，返回 value
 		return reply.Value
 	}
-
 }
 
+// PutAppend shared by Put and Append.
+//
+// you can send an RPC with code like this:
+// ok := ck.servers[i].Call("KVServer.PutAppend", &args, &reply)
+//
+// the types of args and reply (including whether they are pointers)
+// must match the declared types of the RPC handler function's
+// arguments. and reply must be passed as a pointer.
 func (ck *Clerk) PutAppend(key string, value string, op string) {
-	args := &PutAppendArgs{
+	// You will have to modify this function.
+	args := PutAppendArgs{
 		Key:      key,
 		Value:    value,
 		Op:       op,
@@ -59,10 +71,11 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 		var reply PutAppendReply
 		ok := ck.servers[ck.leaderId].Call("KVServer.PutAppend", &args, &reply)
 		if !ok || reply.Err == ErrWrongLeader || reply.Err == ErrTimeout {
+			// 请求失败，选择另一个节点重试
 			ck.leaderId = (ck.leaderId + 1) % len(ck.servers)
 			continue
 		}
-		// 调用成功 返回
+		// 调用成功，返回
 		ck.seqId++
 		return
 	}
