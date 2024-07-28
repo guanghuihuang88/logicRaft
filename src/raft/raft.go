@@ -72,6 +72,12 @@ func (rf *Raft) GetState() (int, bool) {
 	return rf.currentTerm, rf.role == Leader
 }
 
+func (rf *Raft) GetRaftStateSize() int {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	return rf.persister.RaftStateSize()
+}
+
 // Start 就一个新的日志条目达成一致
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	rf.mu.Lock()
