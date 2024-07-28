@@ -13,6 +13,22 @@
 > 7. Students' Guide to Raft ：https://thesquareplanet.com/blog/students-guide-to-raft/
 > 8. An Introduction to Distributed Systems**：**https://github.com/aphyr/distsys-class
 
+
+## 0 一个 GET 操作的生命历程
+
+<img src="https://guanghuihuang-1315055500.cos.ap-guangzhou.myqcloud.com/%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/%E6%95%B0%E6%8D%AE%E5%BA%93/mit6.824/%E4%B8%80%E6%9D%A1Get%E6%93%8D%E4%BD%9C%E7%9A%84%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F.png" alt="image" style="zoom: 100%;" />
+
+用户向 Client 客户端发送一个 Get 请求，Client 将其作为入参，通过 RPC 依次调用所有 Server 端的 Get 函数，直到调用到 Leader Server 为止
+
+Leader Server 会将收到的 Get 请求作为一个 Get 操作日志传给 Raft 模块，Raft 模块会将其存放到 Log 日志数组的最新下标 n 处，然后 Leader Server 在结果管道 Map 中创建一个对应下标 n 的结果管道 ResultChannelN，然后监听
+
+当 Leader Raft 通过一轮或多轮日志同步 RPC 后，有超过一半的 Raft 节点都同步到了这条 Get 操作日志，Leader Raft 更新 commitIndex 为 下标 n，并将日志添加到 Raft 模块的日志应用管道 AppChannel 中
+
+Leader Server 的日志应用线程会监听 AppChannel，将新的操作日志应用到 KV 存储中，然后将查询结果添加到结果管道 ResultChannelN
+
+Leader Server 主线程在 Get 函数监听到结果管道中的结果后，会将其作为 RPC 调用的结果返回给 Client
+
+
 ## 1 Raft 基本原理
 
 ### 使用场景
@@ -937,17 +953,3 @@ type KVServer struct {
    // Your definitions here.
 }
 ```
-
-### 3 一个 GET 操作的生命历程
-
-<img src="https://guanghuihuang-1315055500.cos.ap-guangzhou.myqcloud.com/%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/%E6%95%B0%E6%8D%AE%E5%BA%93/mit6.824/%E4%B8%80%E6%9D%A1Get%E6%93%8D%E4%BD%9C%E7%9A%84%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F.png" alt="image" style="zoom: 100%;" />
-
-用户向 Client 客户端发送一个 Get 请求，Client 将其作为入参，通过 RPC 依次调用所有 Server 端的 Get 函数，直到调用到 Leader Server 为止
-
-Leader Server 会将收到的 Get 请求作为一个 Get 操作日志传给 Raft 模块，Raft 模块会将其存放到 Log 日志数组的最新下标 n 处，然后 Leader Server 在结果管道 Map 中创建一个对应下标 n 的结果管道 ResultChannelN，然后监听
-
-当 Leader Raft 通过一轮或多轮日志同步 RPC 后，有超过一半的 Raft 节点都同步到了这条 Get 操作日志，Leader Raft 更新 commitIndex 为 下标 n，并将日志添加到 Raft 模块的日志应用管道 AppChannel 中
-
-Leader Server 的日志应用线程会监听 AppChannel，将新的操作日志应用到 KV 存储中，然后将查询结果添加到结果管道 ResultChannelN
-
-Leader Server 主线程在 Get 函数监听到结果管道中的结果后，会将其作为 RPC 调用的结果返回给 Client
