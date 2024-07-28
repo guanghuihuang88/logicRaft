@@ -27,11 +27,11 @@ Raft 会将**客户端请求**序列化成操作序列，称为**操作日志**�
 
 在工程实践中，通常一个 Raft Server 会包含多个数据分片的**状态机**（对应上文说的数据分片的一个副本），不同机器上从属于一个数据分片的副本联合起来组成一个 Raft Group，这样一个集群中就会存在多个 Raft Group。如 TiKV 的架构（他们的数据分片叫 Region）：
 
-<img src="https://guanghuihuang-1315055500.cos.ap-guangzhou.myqcloud.com/%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/%E6%95%B0%E6%8D%AE%E5%BA%93/mit6.824/raft01.png?q-sign-algorithm=sha1&q-ak=AKIDVywSEvjMSY6OporABdfjca-PdMg6gC6Dvs_cn6RJegll_ZDQDQhzrrFQwQZUWINL&q-sign-time=1702262830;1702266430&q-key-time=1702262830;1702266430&q-header-list=host&q-url-param-list=ci-process&q-signature=2987a6a1007ebd91c167adee0a9a738700459ca6&x-cos-security-token=sPx7qcXWG4kq9wih76tJJeXGBaFuWoSae13bb8a6c0cb34c14e70f5c051233020UTOBEDo0xcgWB7c8KSoBPgtdA6JO8Y7X90zqwLcZ2sNHlySvKpejI3VUDV46gc0h0gqhzF5iCxcQ0b4A8R4J0ewmuKn6C_SadenK7JspJwLmi3JqBjk5TTHPdxLxuwCRhGTplnDeH7K5LY13MGIYkrqtCp8-ocXSId_qr7qwQMlOarwsrah1gC1RVey_SsUb&ci-process=originImage" alt="image"  />
+<img src="https://guanghuihuang-1315055500.cos.ap-guangzhou.myqcloud.com/%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/%E6%95%B0%E6%8D%AE%E5%BA%93/mit6.824/raft01.png" alt="image"  />
 
 但在本课程 Raft 部分中，我们只考虑最简单情况：一个 Raft Server 中只包含一个状态机。在后面 ShardKV 部分中，会扩展到类似 TiKV 的架构。
 
-所有 Raft Server 初始状态为空，然后回按照按相同的顺序执行相同的客户端请求，进而保证状态机是一致的。如果某个 Raft Server 宕机重启后，进度落下了，Raft 算法会负责将其日志进行追平。只要有**超过半数**的 Peer 存活并且可以互相通信，Raft 就可以继续正常运行。如果当前没有多数派存活，则 Raft 将会陷入停滞，不能继续接受客户端来的请求。不过，一旦多数 Peer 重新可以互通，Raft 就又可以继续工作。
+所有 Raft Server 初始状态为空，然后会按照按相同的顺序执行相同的客户端请求，进而保证状态机是一致的。如果某个 Raft Server 宕机重启后，进度落下了，Raft 算法会负责将其日志进行追平。只要有**超过半数**的 Peer 存活并且可以互相通信，Raft 就可以继续正常运行。如果当前没有多数派存活，则 Raft 将会陷入停滞，不能继续接受客户端来的请求。不过，一旦多数 Peer 重新可以互通，Raft 就又可以继续工作。
 
 这里面涉及几个核心概念角色：
 
@@ -41,8 +41,7 @@ Raft 会将**客户端请求**序列化成操作序列，称为**操作日志**�
 
 三者关系可以参照[论文](https://pdos.csail.mit.edu/6.824/papers/raft-extended.pdf)中的图：
 
-<img src="https://guanghuihuang-1315055500.cos.ap-guangzhou.myqcloud.com/%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/%E6%95%B0%E6%8D%AE%E5%BA%93/mit6.824/raft02.png?q-sign-algorithm=sha1&q-ak=AKIDUhR6fpElcOWGwM3cSwVP6ePftCREv8l-sOelEebSrBLob0ItR5l808yZxmBmV5Sv&q-sign-time=1702262911;1702266511&q-key-time=1702262911;1702266511&q-header-list=host&q-url-param-list=ci-process&q-signature=5eb1a69f43f80382377584c00c14290b8bab79f4&x-cos-security-token=sPx7qcXWG4kq9wih76tJJeXGBaFuWoSa6cc15bd66e4b57ca009580a39562f152UTOBEDo0xcgWB7c8KSoBPjuBn_6I6gx2MF5_uZRAcHdRqBX8hrVUNK2-xgMPfMfxNz699qT7NAFBkQ8ufzotLSTq2-38ber3dbNCUNLOmFDSu7BFmE9O7mSfx2gBrrPhmYBBOtHi0TD0eTZoc20W8KK4RySejpKLxVFcYbFH-4yQym1Wh4dC8fsaWhxPvZ0L&ci-process=originImage" alt="image" style="zoom: 25%;" />
-
+<img src="https://guanghuihuang-1315055500.cos.ap-guangzhou.myqcloud.com/%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/%E6%95%B0%E6%8D%AE%E5%BA%93/mit6.824/raft02.png" alt="image" style="zoom: 25%;" />
 图中的四个步骤含义如下：
 
 1. **写入**：**客户端**向 Raft 发送写请求，写入数据
@@ -56,7 +55,7 @@ Raft 会将**客户端请求**序列化成操作序列，称为**操作日志**�
 
 > 论文提供了一个工程级别的 Raft 实现，我们要保证准确实现了下图中的所有细节
 
-<img src="https://guanghuihuang-1315055500.cos.ap-guangzhou.myqcloud.com/%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/%E6%95%B0%E6%8D%AE%E5%BA%93/mit6.824/raft05.png?q-sign-algorithm=sha1&q-ak=AKIDbvU4hFi1mFN8f07fTDt17EFcDXqcN0sC02vx2eWxb_cScUY8-6KOnt5CFWB5wSDH&q-sign-time=1702262949;1702266549&q-key-time=1702262949;1702266549&q-header-list=host&q-url-param-list=ci-process&q-signature=8466715e1a6dd4b68d57e295faec10c6b28a442d&x-cos-security-token=6eJrXkVMb65tYZbaT5OY2u47Z93r9NAa558817edb2767d8ad3c18812c691b4d8rKmGcCHv2bn4D5KjWtV9soWDsGcOdZeJHDyzOFCDoZmKBgiBfHGlR49uynAr4K9MaLwmb6vLcvmj3ob6mYcdAPjKa77ZhnUGijQrUcbHVJJ53VmKfJqdEDA-YRoOpmDupcTRW4RZ_r4Tecj1h6-iDMYdEs6bQscDL_QhFwxX1qAxhcIT47vwWF60gl1dCUbQ&ci-process=originImage" alt="image"  />
+<img src="https://guanghuihuang-1315055500.cos.ap-guangzhou.myqcloud.com/%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/%E6%95%B0%E6%8D%AE%E5%BA%93/mit6.824/raft05.png" alt="image"  />
 
 > 下面说一下我们如何来组织 Raft 代码，可以从三个角度来鸟瞰式地纵览 Raft：
 >
@@ -115,7 +114,7 @@ rf.GetState() (term, isLeader)
 type ApplyMsg struct
 ```
 
-<img src="https://guanghuihuang-1315055500.cos.ap-guangzhou.myqcloud.com/%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/%E6%95%B0%E6%8D%AE%E5%BA%93/mit6.824/raft03.png?q-sign-algorithm=sha1&q-ak=AKID7kPhQDOQgC0QIdla5xBegBTQQ2IVEFYfB0c9KhWzokNWoCyXjLaov0Oyrzoie9iJ&q-sign-time=1702262924;1702266524&q-key-time=1702262924;1702266524&q-header-list=host&q-url-param-list=ci-process&q-signature=c6002769352ef2f9fbff4bd774f695859ab9f2de&x-cos-security-token=sPx7qcXWG4kq9wih76tJJeXGBaFuWoSa6f06efa57b8cd23c1d237e99c1854c7eUTOBEDo0xcgWB7c8KSoBPkVa-hY_1ymKxuJZ7P1YY0BefZcP_6wFAzccHwnKnhi59hmiLtA5fk0gDfuWMYqKf8VQSaN5Ig1MD4h2H1vue2C3_He2l6QFGnC7356_4T0lmRv8oO7Ag-zn4zP9ChZVo6l8H43FftqG_FJrwz2pZuiJbY9MRRvOekAPkxeieS6J&ci-process=originImage" alt="image" style="zoom: 100%;" />
+<img src="https://guanghuihuang-1315055500.cos.ap-guangzhou.myqcloud.com/%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/%E6%95%B0%E6%8D%AE%E5%BA%93/mit6.824/raft03.png" alt="image" style="zoom: 100%;" />
 
 服务通过调用 `Make(peers, me, persister, applyCh)` 创建一个 Raft Peer。其中 peers 是所有参与 Raft Group 的对端句柄数组，通过这些句柄，可以给所有 Peer 发送 RPC。`me` 是本 Raft Peer 在数组中的下标，测试会保证所有 Raft Peer 看到的数组中元素顺序是一致的。
 
@@ -159,9 +158,9 @@ const (
 )
 ```
 
-<img src="https://guanghuihuang-1315055500.cos.ap-guangzhou.myqcloud.com/%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/%E6%95%B0%E6%8D%AE%E5%BA%93/mit6.824/raft04.png?q-sign-algorithm=sha1&q-ak=AKIDFeb7Tk2NOZK1Kt7SUgslizKaYZEqh4TQ8z7Hr8HNKXFcgSzoQRoBJeUUAwj5rajW&q-sign-time=1702262939;1702266539&q-key-time=1702262939;1702266539&q-header-list=host&q-url-param-list=ci-process&q-signature=ddbd276a9c7b0384a2cf3b534d76c74e0966ba20&x-cos-security-token=sPx7qcXWG4kq9wih76tJJeXGBaFuWoSa3cb1e1c3dd0dc7ff1e37ef7b24e2ff2dUTOBEDo0xcgWB7c8KSoBPh4gO9vuLHGLx_uYjDRjkVn-wHae4R-tDD_O1Vem3olcRUh7Y4j-QNOm5wu5VjXTFGAGwxMSZvg5qnueJ3eg8EyHyQZLoMSW2OC18zDyMqzwskF4ZEE85QvTlvt83cpPvZipnzxhRyepa5Ppr7Bg8Gqr3i3jVxd_doVdfJqSv6pI&ci-process=originImage" alt="image" style="zoom: 33%;" />
+<img src="https://guanghuihuang-1315055500.cos.ap-guangzhou.myqcloud.com/%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/%E6%95%B0%E6%8D%AE%E5%BA%93/mit6.824/raft04.png" alt="image" style="zoom: 33%;" />
 
-可以根据这三个状态抽象出三个函数：`becomeFollower`，`becomeCandidate`，`becomeLeader`，即驱动状态机的“线”。并且增加一些限制，禁止一些图中不存在的“线”。其中 `Locked` 的后缀，说明该函数必须在锁的保护下调用，因为函数内部并没有加锁。另外，还可以加一些适当的日志，表明角色的转换过程，在进行调试时，角色转换时最重要的信息之一。
+可以根据这三个状态抽象出三个函数：`becomeFollower`，`becomeCandidate`，`becomeLeader`，即驱动状态机的“线”。并且增加一些限制，禁止一些图中不存在的“线”。其中 `Locked` 的后缀，说明该函数必须在锁的保护下调用，因为函数内部并没有加锁。另外，还可以加一些适当的日志，表明角色的转换过程，在进行调试时，角色转换是最重要的信息之一。
 
 ```Go
 func (rf *Raft) becomeFollowerLocked(term int)
@@ -274,7 +273,7 @@ func (rf *Raft) contextLostLocked(role Role, term int) bool {
 
 ### 单次 RPC
 
-单次 RPC 包括**构造 RPC 参数、发送 RPC等待结果、对 RPC 结果进行处理**三个部分。构造参数我们在 `startElection` 函数内完成了，因此 `askVoteFromPeer` 函数中就只需要包括后梁部分即可。（这里实现为嵌套函数的作用是，可以在各个 goroutine 中修改外层的局部变量 votes）
+单次 RPC 包括**构造 RPC 参数、发送 RPC等待结果、对 RPC 结果进行处理**三个部分。构造参数我们在 `startElection` 函数内完成了，因此 `askVoteFromPeer` 函数中就只需要包括后两个部分即可。（这里实现为嵌套函数的作用是，可以在各个 goroutine 中修改外层的局部变量 votes）
 
 ```Go
 askVoteFromPeer := func(peer int, args *RequestVoteArgs, term int) {
@@ -384,7 +383,7 @@ func (rf *Raft) replicationTicker(term int) {
 2. **单次 RPC**：对某个 Peer 来发送心跳，并且处理 RPC 返回值，称为 `replicateToPeer`
 3. **回调函数**：所有 Peer 在运行时都有可能收到要票请求，`RequestVote` 这个回调函数，就是定义该 Peer 收到要票请求的处理逻辑
 
-PartB 需要定义日志格式，在心跳逻辑的基础上，要需要日志同步的逻辑。总体上来说，Leader 需要维护一个各个 Peer 的进度视图（`nextIndex` 和 `matchIndex` 数组）。其中 `nextIndex` 用于进行**日志同步时**的**匹配点试探**，`matchIndex` 用于**日志同步成功后**的**匹配点记录**。依据全局匹配点分布，我们可以计算出当前全局的 `commitIndex`，然后再通过之后轮次的日志复制 RPC 下发给各个 Follower。
+PartB 需要定义日志格式，在心跳逻辑的基础上，需要日志同步的逻辑。总体上来说，Leader 需要维护一个各个 Peer 的进度视图（`nextIndex` 和 `matchIndex` 数组）。其中 `nextIndex` 用于进行**日志同步时**的**匹配点试探**，`matchIndex` 用于**日志同步成功后**的**匹配点记录**。依据全局匹配点分布，我们可以计算出当前全局的 `commitIndex`，然后再通过之后轮次的日志复制 RPC 下发给各个 Follower。
 
 每个 Follower 收到 `commitIndex` 之后，再去 apply 本地的已提交日志到状态机。但这个 **apply 的流程**，我们留到之后一章来专门做，本章就暂时留待 TODO 了。因此，本章就只实现逻辑：**匹配点的试探**和**匹配后的更新**。
 
@@ -540,10 +539,6 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
         if args.Term < rf.currentTerm {
           return
         }
-  
-        // 只要认可对方是Leader就重置时钟
-        defer rf.resetElectionTimerLocked()
-  
         if args.Term >= rf.currentTerm {
           rf.becomeFollowerLocked(args.Term)
         }
@@ -673,7 +668,7 @@ func (rf *Raft) applicationTicker() {
                 rf.mu.Unlock()
 
                 for i, entry := range entries {
-                        rf.applyCh <- ApplyMsg{
+                        rf.applyCh <- ApplyMsg {
                                 CommandValid: entry.CommandValid,
                                 Command:      entry.Command,
                                 CommandIndex: rf.lastApplied + 1 + i, // must be cautious
@@ -729,7 +724,7 @@ func (rf *Raft) replicateToPeer(peer int, args *AppendEntriesArgs) {
 
 				// 一致性检查成功，更新 rf.matchIndex 后
         majorityMatched := rf.getMajorityIndexLocked()
-        if majorityMatched > rf.commitIndex && rf.log[majorityMatched].Term == rf.currentTerm {
+        if majorityMatched > rf.commitIndex {
                 rf.commitIndex = majorityMatched
                 rf.applyCond.Signal()
         }
@@ -779,3 +774,180 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 
 ## 6 状态持久化
 
+略
+
+## 7 日志压缩（快照）
+
+日志压缩后，Raft需要记录额外的两个信息，`lastIncludeIndex`、`lastIncludeTerm`表示快照中最后一个log的index和Term。
+
+
+
+## 8 分布式 KV
+
+本文将基于前面实现的 raft 算法，构建一个高可用的分布式 Key/Value 服务
+
+<img src="https://guanghuihuang-1315055500.cos.ap-guangzhou.myqcloud.com/%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/%E6%95%B0%E6%8D%AE%E5%BA%93/mit6.824/1280X1280.PNG" alt="image"  />
+
+大致的流程是客户端向后端的 servers 发起请求，后端的服务是由多个节点组成的，每个节点之间使用 raft 进行状态复制，客户端会选择将请求发送到 Leader 节点，然后由 Leader 节点进行状态复制，即发送日志，当收到多数的节点成功提交日志的响应之后，Leader 会更新自己的 commitIndex，表示这条日志提交成功，并且 apply 到状态机中，然后返回结果给客户端。
+
+在这一个分布式 KV 部分完成之后，加上前面已经实现了的 raft 部分，我们就基本实现了下图中提到的每一个部分（这个图可能大家在前面的学习中已经看到过了，主要包含了 raft 的一些主要方法的状态转换和基于 raft 的 KV 服务的交互）
+
+<img src="https://guanghuihuang-1315055500.cos.ap-guangzhou.myqcloud.com/%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/%E6%95%B0%E6%8D%AE%E5%BA%93/mit6.824/1280X1280%20%281%29.PNG" alt="image"  />
+
+在 mit6.824 课程中，分布式 KV 部分主要是在目录 kvraft 中，大致包含客户端和服务端的逻辑
+
+客户端是由一个叫 Clerk 的结构体进行表示的，它主要是维护了客户端发送请求到后端 KV 服务的逻辑
+
+```Go
+type Clerk struct {
+   servers []*labrpc.ClientEnd
+   // You will have to modify this struct.
+}
+```
+
+Clerk 会向 KV 服务发送三种类型的请求：
+- Get：通过 key 获取 value
+- Put：设置 key/value 对
+- Append：将值追加到 key 对应的 value 上，如果 key 不存在，则相当于 Put
+
+需要注意的是我们的 Get/Put/Append 方法需要保证是具有线性一致性的。线性一致性简单来说是要求客户端的修改对后续的请求都是生效的，即其他客户端能够立即看到修改后的结果，而不会因为我们的多副本机制而看到不一样的结果，最终的目的是要我们的 kv 服务对客户端来说看起来“像是只有一个副本”
+
+服务端的代码主要是在 server.go 中，结构体 KVServer 描述了一个后端的 kv server 节点所维护的状态：
+
+```Go
+type KVServer struct {
+   mu      sync.Mutex
+   me      int
+   rf      *raft.Raft
+   applyCh chan raft.ApplyMsg
+   dead    int32 // set by Kill()
+
+   maxraftstate int // snapshot if log grows this big
+
+   // Your definitions here.
+}
+```
+
+可以看到 KVServer 维护了一个 raft 库中的 Raft 结构体，表示其是一个 raft 集群中的节点，它会通过 raft 提供的功能向其他的 KVServer 同步状态，让整个 raft 集群中的数据保持一致
+
+### 1 kvraft Client 端处理
+
+客户端的结构体 Clerk：
+
+```Go
+type Clerk struct {
+   servers []*labrpc.ClientEnd
+   // You will have to modify this struct.
+}
+```
+
+可以看到其中维护了 servers 列表，表示的是后端分布式 KV 服务的所有节点信息，我们可以通过这个信息去向指定的节点发送数据读写的请求
+
+每个 kv 服务的节点都是一个 raft 的 peer，客户端发送请求到 kv 服务的 Leader 节点，然后 Leader 节点会存储请求日志在本地，然后将日志通过 raft 发送给其他的节点进行状态同步。所以 raft 日志其实存储的是一连串客户端请求，然后 server 节点会按照顺序执行请求，并将结果存储到状态机中
+
+Get 方法的处理大致如下：
+
+```Go
+func (ck *Clerk) Get(key string) string {
+   args := GetArgs{Key: key}
+   for {
+      var reply GetReply
+      ok := ck.servers[ck.leaderId].Call("KVServer.Get", &args, &reply)
+      if !ok || reply.Err == ErrWrongLeader || reply.Err == ErrTimeout {
+         // 节点id加一，继续重试
+         ck.leaderId = (ck.leaderId + 1) % len(ck.servers)
+         continue
+      }
+      // 请求成功，返回 value
+      return reply.Value
+   }
+}
+```
+
+Put 和 Append 的逻辑由于比较类似，所以将其作为一个 RPC 请求，只是加了一个名为 Op 的参数加以区分。
+
+```Go
+func (ck *Clerk) PutAppend(key string, value string, op string) {
+   args := PutAppendArgs{
+      Key:   key,
+      Value: value,
+      Op:    op,
+   }
+
+   for {
+      var reply PutAppendReply
+      ok := ck.servers[ck.leaderId].Call("KVServer.PutAppend", &args, &reply)
+      if !ok || reply.Err == ErrWrongLeader || reply.Err == ErrTimeout {
+         // 节点id加一，继续重试
+         ck.leaderId = (ck.leaderId + 1) % len(ck.servers)
+         continue
+      }
+      // 请求成功
+      return
+   }
+}
+```
+
+### 2 kvraft Server 端处理
+
+按照我们前面梳理的大致交互逻辑，客户端的请求到达之后，我们需要首先通过 raft 模块将其存储到 raft 日志中，回想一下我们在前面实现的 raft 库中，提供了一个 `Start` 入口方法，这个方法是 raft 接收外部请求的，我们会将请求通过这个方法传递过去
+
+```Go
+func (rf *Raft) Start(command interface{}) (int, int, bool) {
+   rf.mu.Lock()
+   defer rf.mu.Unlock()
+
+   if rf.role != Leader {
+      return 0, 0, false
+   }
+   rf.log = append(rf.log, LogEntry{
+      CommandValid: true,
+      Command:      command,
+      Term:         rf.currentTerm,
+   })
+   LOG(rf.me, rf.currentTerm, DLeader, "Leader accept log [%d]T%d", len(rf.log)-1, rf.currentTerm)
+   rf.persistLocked()
+
+   return len(rf.log) - 1, rf.currentTerm, true
+}
+```
+
+`Start` 方法会返回当前的节点是不是 Leader，如果不是的话，我们需要向客户端反馈一个 `ErrWrongLeader` 错误，客户端获取到之后，发现此节点并不是 Leader，那么会挑选下一个节点重试请求
+
+当 raft 集群中的 Leader 节点处理了 Start 请求之后，它会向其他的 Follower 节点发送 `AppendEntries` 消息，将日志同步到其他的 Follower 节点，当大多数的节点都正常处理之后，Leader 会收到消息，然后更新自己的 `commitIndex`，然后将日志通过 applyCh 这个通道发送过去
+
+<img src="https://guanghuihuang-1315055500.cos.ap-guangzhou.myqcloud.com/%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/%E6%95%B0%E6%8D%AE%E5%BA%93/mit6.824/raft02.png" alt="image" style="zoom: 25%;" />
+
+然后 kv server 收到 apply 消息之后，将命令应用到本地的状态机中，然后返回给客户端
+
+也就是说，我们客户端需要一直等待 raft 模块同步完成，并且 Leader 节点将操作应用到状态机之后，才会返回结果给客户端
+
+所以这里我们需要启动一个后台线程来执行 apply 任务，主要是从 applyCh 中接收来自 raft 的日志消息，处理完之后，将结果存储到一个 channel 中，这时候 Get/Put/Append 方法就能从这个 channel 中获取到结果，并返回给客户端
+
+```Go
+type KVServer struct {
+   mu      sync.Mutex
+   me      int
+   rf      *raft.Raft
+   applyCh chan raft.ApplyMsg
+   dead    int32 // set by Kill()
+
+   maxraftstate int // snapshot if log grows this big
+
+   // Your definitions here.
+}
+```
+
+### 3 一个 GET 操作的生命历程
+
+<img src="https://guanghuihuang-1315055500.cos.ap-guangzhou.myqcloud.com/%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0/%E6%95%B0%E6%8D%AE%E5%BA%93/mit6.824/%E4%B8%80%E6%9D%A1Get%E6%93%8D%E4%BD%9C%E7%9A%84%E7%94%9F%E5%91%BD%E5%91%A8%E6%9C%9F.png" alt="image" style="zoom: 100%;" />
+
+用户向 Client 客户端发送一个 Get 请求，Client 将其作为入参，通过 RPC 依次调用所有 Server 端的 Get 函数，直到调用到 Leader Server 为止
+
+Leader Server 会将收到的 Get 请求作为一个 Get 操作日志传给 Raft 模块，Raft 模块会将其存放到 Log 日志数组的最新下标 n 处，然后 Leader Server 在结果管道 Map 中创建一个对应下标 n 的结果管道 ResultChannelN，然后监听
+
+当 Leader Raft 通过一轮或多轮日志同步 RPC 后，有超过一半的 Raft 节点都同步到了这条 Get 操作日志，Leader Raft 更新 commitIndex 为 下标 n，并将日志添加到 Raft 模块的日志应用管道 AppChannel 中
+
+Leader Server 的日志应用线程会监听 AppChannel，将新的操作日志应用到 KV 存储中，然后将查询结果添加到结果管道 ResultChannelN
+
+Leader Server 主线程在 Get 函数监听到结果管道中的结果后，会将其作为 RPC 调用的结果返回给 Client
